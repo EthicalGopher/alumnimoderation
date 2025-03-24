@@ -1,17 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	
 	"os"
 
 	"strings"
-// "github.com/joho/godotenv" 
-	"github.com/EthicalGopher/rag/groq"
+	// "github.com/joho/godotenv"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/api/option"
 )
 
-const model = "deepseek-r1-distill-llama-70b"
+
 
 func main() {
 	// err:=godotenv.Load()
@@ -19,13 +23,19 @@ func main() {
 	// 	fmt.Println(err)
 	// }
 	// var api = os.Getenv("APIKEY")
-	api := "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"
+	api := "AIzaSyD43BuelxxT0jVCuL8WoVKFKVVOoegwn1Q"
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowMethods: "POST,GET",
 	}))
 	slangs:=fmt.Sprint(Decodefile())
+	app.Get("/html",func(c*fiber.Ctx)error{
+		component:=Show()
+		c.Set("Content-Type", "text/html") // Set the Content-Type header to text/html
+		return component.Render(c.Context(),c)
+	})
+
 	app.Post("/add",func(c*fiber.Ctx)error{
 		input:=c.Query("input")
 		Addtext(input)
@@ -78,7 +88,10 @@ flag
 🔹 Slang List (To Be Provided in Context)
 (Example:)
 `+slangs
-		response := groq.Ragfromgroq(api, input, about, model)
+		response,err := Verify(api, input, about)
+		if err!=nil{
+			fmt.Println(err)
+		}
 		if strings.Contains(strings.ToLower(response), "flag") {
 			return c.SendString("")
 		}
@@ -127,4 +140,33 @@ func Addtext(input string)error{
 		return err
 	}
 	return nil
+}
+
+
+
+func Verify(api, input, about string) (string, error) {
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(api))
+	if err != nil {
+		return "", fmt.Errorf("error creating Gemini client: %w", err)
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-2.0-flash") // Use gemini-pro instead of gemini-2.0-flash
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(about)},
+	}
+
+	resp, err := model.GenerateContent(ctx, genai.Text(input))
+	if err != nil {
+		return "", fmt.Errorf("error generating content: %w", err)
+	}
+
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+			return string(text), nil
+		}
+	}
+
+	return "", fmt.Errorf("unexpected response format from Gemini")
 }
