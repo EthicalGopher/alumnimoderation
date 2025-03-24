@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"strings"
-"github.com/joho/godotenv" 
+// "github.com/joho/godotenv" 
 	"github.com/EthicalGopher/rag/groq"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -14,12 +14,12 @@ import (
 const model = "llama-3.3-70b-versatile"
 
 func main() {
-	err:=godotenv.Load()
-	if err!=nil{
-		fmt.Println(err)
-	}
-	var api = os.Getenv("APIKEY")
-	
+	// err:=godotenv.Load()
+	// if err!=nil{
+	// 	fmt.Println(err)
+	// }
+	// var api = os.Getenv("APIKEY")
+	api := "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"
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
@@ -86,7 +86,7 @@ flag
 
 	})
 	
-	app.Listen(":8090")
+	app.Listen("0.0.0.0:8090")
 }
 
 
