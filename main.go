@@ -11,7 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-const model = "llama-3.3-70b-versatile"
+const model = "deepseek-r1-distill-llama-70b"
 
 func main() {
 	// err:=godotenv.Load()
@@ -19,7 +19,7 @@ func main() {
 	// 	fmt.Println(err)
 	// }
 	// var api = os.Getenv("APIKEY")
-	api := "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"
+	api := "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"
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
