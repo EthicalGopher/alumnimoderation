@@ -3,46 +3,68 @@ package main
 import (
 	"context"
 	"fmt"
-	
 	"os"
-
 	"strings"
-	// "github.com/joho/godotenv"
+	"sync"
+
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/generative-ai-go/genai"
+	"github.com/joho/godotenv"
+	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
 )
 
+// Rate Limiter Setup
+const (
+	requestsPerSecond = 2  // Adjust as needed
+	burstSize         = 5  // Adjust as needed
+)
 
+var (
+	limiter *rate.Limiter
+	mu      sync.Mutex
+)
+
+func init() {
+	limiter = rate.NewLimiter(rate.Limit(requestsPerSecond), burstSize)
+}
 
 func main() {
-	// err:=godotenv.Load()
-	// if err!=nil{
-	// 	fmt.Println(err)
-	// }
-	// var api = os.Getenv("APIKEY")
-	api := "AIzaSyD43BuelxxT0jVCuL8WoVKFKVVOoegwn1Q"
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println(err)
+	}
+	var api = os.Getenv("APIKEY")
+
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowMethods: "POST,GET",
 	}))
-	slangs:=fmt.Sprint(Decodefile())
-	app.Get("/html",func(c*fiber.Ctx)error{
-		component:=Show()
+	slangs := fmt.Sprint(Decodefile())
+	app.Get("/html", func(c *fiber.Ctx) error {
+		component := Show()
 		c.Set("Content-Type", "text/html") // Set the Content-Type header to text/html
-		return component.Render(c.Context(),c)
+		return component.Render(c.Context(), c)
 	})
 
-	app.Post("/add",func(c*fiber.Ctx)error{
-		input:=c.Query("input")
+	app.Post("/add", func(c *fiber.Ctx) error {
+		input := c.Query("input")
 		Addtext(input)
 
 		return c.SendString("Added to the list")
 	})
 	app.Get("/", func(c *fiber.Ctx) error {
+		// Rate Limiting Logic
+		mu.Lock()
+		if !limiter.Allow() {
+			mu.Unlock()
+			return c.Status(fiber.StatusTooManyRequests).SendString("Too many requests. Please try again later.")
+		}
+		mu.Unlock()
+
 		input := c.Query("input")
 
 		about := `
@@ -87,9 +109,9 @@ flag
 
 🔹 Slang List (To Be Provided in Context)
 (Example:)
-`+slangs
-		response,err := Verify(api, input, about)
-		if err!=nil{
+` + slangs
+		response, err := Verify(api, input, about)
+		if err != nil {
 			fmt.Println(err)
 		}
 		if strings.Contains(strings.ToLower(response), "flag") {
@@ -98,18 +120,15 @@ flag
 		return c.SendString(input)
 
 	})
-	
+
 	app.Listen("0.0.0.0:8090")
 }
-
-
-
 
 func Decodefile() []string {
 	file, err := os.ReadFile("slang.txt")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
-		
+
 	}
 
 	alltext := string(file)
@@ -125,24 +144,21 @@ func Decodefile() []string {
 	return decoded
 }
 
-
-func Addtext(input string)error{
-	file,err:=os.OpenFile("slang.txt",os.O_APPEND|os.O_WRONLY,0644)
-	if err!=nil{
+func Addtext(input string) error {
+	file, err := os.OpenFile("slang.txt", os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 	defer file.Close()
-	input=fmt.Sprintln(input)
-	_,err=file.WriteString(input)
-	if err!=nil{
+	input = fmt.Sprintln(input)
+	_, err = file.WriteString(input)
+	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 	return nil
 }
-
-
 
 func Verify(api, input, about string) (string, error) {
 	ctx := context.Background()
@@ -152,7 +168,7 @@ func Verify(api, input, about string) (string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-2.0-flash") // Use gemini-pro instead of gemini-2.0-flash
+	model := client.GenerativeModel("gemini-2.0-flash")
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{genai.Text(about)},
 	}
@@ -167,6 +183,5 @@ func Verify(api, input, about string) (string, error) {
 			return string(text), nil
 		}
 	}
-
 	return "", fmt.Errorf("unexpected response format from Gemini")
 }
