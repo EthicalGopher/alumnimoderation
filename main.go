@@ -15,7 +15,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-// Improved Leaky Bucket Rate Limiter
+
 type LeakyBucket struct {
 	capacity     int64
 	leakRate     time.Duration
@@ -201,6 +201,10 @@ func Addtext(input string) error {
 	}
 	return nil
 }
+
+
+
+// [Gemini AI code here ]
 
 func Verify(api, input, about string) (string, error) {
 	ctx := context.Background()

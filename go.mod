@@ -1,11 +1,12 @@
-module github.com/EthicalGopher/alumnimoderation
+module github.com/EthicalGopher/slangdetector
 
 go 1.23.7
 
 require (
-	github.com/a-h/templ v0.3.856
+	github.com/a-h/templ v0.3.857
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/google/generative-ai-go v0.19.0
+	github.com/joho/godotenv v1.5.1
 	google.golang.org/api v0.227.0
 )
 
@@ -24,7 +25,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
-	github.com/joho/godotenv v1.5.1
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
