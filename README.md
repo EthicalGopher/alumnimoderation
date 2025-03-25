@@ -119,10 +119,6 @@ curl -X POST "http://localhost:8090/add?input=newslangword"
 - Slang detection accuracy depends on AI model
 - Limited to provided slang list
 
-## 📄 License
-
-[Your License Here - e.g., MIT]
-
 ## 🐛 Reporting Issues
 
 Report issues on the GitHub repository's issue tracker.
