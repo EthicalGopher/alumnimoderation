@@ -4,8 +4,8 @@ templ Show() {
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <title>Slang Detector</title>
         <script src="https://unpkg.com/htmx.org@1.9.10"></script>
         <style>
@@ -26,25 +26,33 @@ templ Show() {
                 margin-bottom: 20px;
             }
 
-            form {
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+                max-width: 600px;
+            }
+
+            .section {
                 background-color: #fff;
                 padding: 20px;
                 border-radius: 8px;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                display: flex;
-                gap: 10px;
+                margin-bottom: 20px;
                 width: 100%;
-                max-width: 500px;
             }
 
             input[type="text"] {
-                flex-grow: 1;
+                width: 100%;
                 padding: 10px;
+                margin-bottom: 10px;
                 border: 1px solid #ddd;
                 border-radius: 4px;
+                box-sizing: border-box;
             }
 
-            button[type="submit"] {
+            button {
                 background-color: #5cb85c;
                 color: white;
                 padding: 10px 20px;
@@ -54,41 +62,81 @@ templ Show() {
                 transition: background-color 0.3s ease;
             }
 
-            button[type="submit"]:hover {
+            button:hover {
                 background-color: #4cae4c;
             }
 
-            #response {
-                margin-top: 20px;
-                padding: 20px;
-                background-color: #fff;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                width: 100%;
-                max-width: 500px;
-                min-height: 50px;
+            #detectResponse, #addResponse {
+                margin-top: 10px;
+                padding: 10px;
+                background-color: #f0f0f0;
+                border-radius: 4px;
             }
 
-            #loading {
-                display: none;
-                color: #5cb85c;
-                font-weight: bold;
-            }
-
-            form.htmx-request #loading {
-                display: block;
+            #slangList {
+                max-height: 200px;
+                overflow-y: auto;
+                border: 1px solid #ddd;
+                padding: 10px;
+                margin-top: 10px;
             }
         </style>
     </head>
     <body>
-        <h1>Slang Detector</h1>
-        <form hx-get="/" hx-target="#response" hx-swap="innerHTML">
-            <input type="text" name="input" id="input" placeholder="Enter text here...">
-            <button type="submit" hx-indicator="#loading">Send</button>
-        </form>
-        <div id="response">
+        <div class="container">
+            <h1>Slang Detector</h1>
+            
+            <div class="section">
+                <h2>Detect Slang</h2>
+                <form 
+                    hx-get="/" 
+                    hx-target="#detectResponse" 
+                    hx-indicator="#detectLoading"
+                >
+                    <input 
+                        type="text" 
+                        name="input" 
+                        placeholder="Enter text to check for slang..."
+                    />
+                    <button type="submit">Detect</button>
+                </form>
+                <div id="detectLoading" class="htmx-indicator">
+                    Checking...
+                </div>
+                <div id="detectResponse"></div>
+            </div>
+
+            <div class="section">
+                <h2>Add Slang Word</h2>
+                <form 
+                    hx-post="/add" 
+                    hx-target="#addResponse" 
+                    hx-indicator="#addLoading"
+                >
+                    <input 
+                        type="text" 
+                        name="input" 
+                        placeholder="Enter slang word to add..."
+                    />
+                    <button type="submit">Add Slang</button>
+                </form>
+                <div id="addLoading" class="htmx-indicator">
+                    Adding...
+                </div>
+                <div id="addResponse"></div>
+            </div>
+
+            <div class="section">
+                <h2>Current Slang List</h2>
+                <button 
+                    hx-get="/list-slangs" 
+                    hx-target="#slangList"
+                >
+                    Refresh Slang List
+                </button>
+                <div id="slangList"></div>
+            </div>
         </div>
-        <div id="loading">Loading...</div>
     </body>
     </html>
 }

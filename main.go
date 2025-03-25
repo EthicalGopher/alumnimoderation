@@ -4,37 +4,77 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"strings"
-	"sync"
-
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/joho/godotenv"
-	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
 )
 
-// Rate Limiter Setup
-const (
-	requestsPerSecond = 2  // Adjust as needed
-	burstSize         = 5  // Adjust as needed
-)
+// Improved Leaky Bucket Rate Limiter
+type LeakyBucket struct {
+	capacity     int64
+	leakRate     time.Duration
+	current      int64
+	lastLeakTime int64
+}
 
-var (
-	limiter *rate.Limiter
-	mu      sync.Mutex
-)
+func NewLeakyBucket(capacity int64, leakRate time.Duration) *LeakyBucket {
+	return &LeakyBucket{
+		capacity:     capacity,
+		leakRate:     leakRate,
+		current:      0,
+		lastLeakTime: time.Now().UnixNano(),
+	}
+}
+
+func (lb *LeakyBucket) Allow() bool {
+	now := time.Now().UnixNano()
+	elapsed := time.Duration(now - atomic.LoadInt64(&lb.lastLeakTime))
+	
+	// Atomic operations for thread-safety
+	leaked := int64(elapsed / lb.leakRate)
+	current := atomic.LoadInt64(&lb.current)
+	
+	newCurrent := max(0, current - leaked)
+	atomic.StoreInt64(&lb.current, newCurrent)
+	atomic.StoreInt64(&lb.lastLeakTime, now)
+
+	if newCurrent < lb.capacity {
+		atomic.AddInt64(&lb.current, 1)
+		return true
+	}
+	return false
+}
+
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+var leakybucket *LeakyBucket
 
 func init() {
-	limiter = rate.NewLimiter(rate.Limit(requestsPerSecond), burstSize)
+	leakybucket = NewLeakyBucket(10, 200*time.Millisecond)
+}
+
+func rateLimiterMiddleware(c *fiber.Ctx) error {
+	if !leakybucket.Allow() {
+		return c.Status(fiber.StatusTooManyRequests).SendString("Too many requests")
+	}
+	return c.Next()
 }
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error loading .env file:", err)
 	}
 	var api = os.Getenv("APIKEY")
 
@@ -43,28 +83,27 @@ func main() {
 		AllowOrigins: "*",
 		AllowMethods: "POST,GET",
 	}))
+	app.Use(rateLimiterMiddleware)
 	slangs := fmt.Sprint(Decodefile())
+	
 	app.Get("/html", func(c *fiber.Ctx) error {
 		component := Show()
-		c.Set("Content-Type", "text/html") // Set the Content-Type header to text/html
+		c.Set("Content-Type", "text/html")
 		return component.Render(c.Context(), c)
 	})
 
 	app.Post("/add", func(c *fiber.Ctx) error {
 		input := c.Query("input")
 		Addtext(input)
-
 		return c.SendString("Added to the list")
 	})
-	app.Get("/", func(c *fiber.Ctx) error {
-		// Rate Limiting Logic
-		mu.Lock()
-		if !limiter.Allow() {
-			mu.Unlock()
-			return c.Status(fiber.StatusTooManyRequests).SendString("Too many requests. Please try again later.")
-		}
-		mu.Unlock()
 
+	app.Get("/list-slangs", func(c *fiber.Ctx) error {
+		slangs := Decodefile()
+		return c.JSON(slangs)
+	})
+
+	app.Get("/", func(c *fiber.Ctx) error {
 		input := c.Query("input")
 
 		about := `
@@ -118,25 +157,27 @@ flag
 			return c.SendString("")
 		}
 		return c.SendString(input)
-
 	})
 
-	app.Listen("0.0.0.0:8090")
+	fmt.Println("Server starting on port 8090")
+	err = app.Listen("0.0.0.0:8090")
+	if err != nil {
+		fmt.Println("Error starting server:", err)
+	}
 }
 
 func Decodefile() []string {
 	file, err := os.ReadFile("slang.txt")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
-
+		return []string{}
 	}
 
 	alltext := string(file)
-
 	alltext = strings.ReplaceAll(alltext, "\r\n", "\n")
-
 	decoded := strings.Split(alltext, "\n")
 
+	// Remove trailing empty strings
 	for len(decoded) > 0 && decoded[len(decoded)-1] == "" {
 		decoded = decoded[:len(decoded)-1]
 	}
@@ -147,14 +188,15 @@ func Decodefile() []string {
 func Addtext(input string) error {
 	file, err := os.OpenFile("slang.txt", os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error opening file:", err)
 		return err
 	}
 	defer file.Close()
+	
 	input = fmt.Sprintln(input)
 	_, err = file.WriteString(input)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error writing to file:", err)
 		return err
 	}
 	return nil
